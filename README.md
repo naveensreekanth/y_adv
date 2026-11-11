@@ -67,7 +67,7 @@ pip install -r requirements.txt
 ```bash
 python run.py
 ```
-Open **http://127.0.0.1:8000** in your browser.
+This automatically selects an available local port (default **http://127.0.0.1:8080**; if busy, it picks the next free port) and opens the UI in your browser.
 
 ### 4. Try Uploading Test Data
 Drag and drop any file from `sample_uploads/` directly onto the upload box:

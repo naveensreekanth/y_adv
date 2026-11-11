@@ -175,8 +175,9 @@ if FRONTEND_DIST.exists():
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
+    @app.get("/")
     @app.get("/{full_path:path}")
-    def serve_spa(full_path: str):
+    def serve_spa(full_path: str = ""):
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not found")
         index_file = FRONTEND_DIST / "index.html"
