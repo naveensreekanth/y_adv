@@ -1,6 +1,6 @@
 # AI-Optimized Yield Advisor
 
-An explainable semiconductor chip-test yield intelligence application. Drop any CSV or Excel (`.xlsx`) wafer sort or yield summary file into the browser UI and get plain-English root causes, interactive wafer defect maps with AI Grad-CAM overlays, hidden burn-in risk screens, test-time savings, and prioritized engineering actions.
+An explainable semiconductor chip-test yield intelligence application that automatically preloads the **AX7-SOC** chip-test dataset on startup and presents plain-English root causes, interactive wafer defect maps with AI Grad-CAM overlays, hidden burn-in risk screens, test-time savings, and prioritized engineering actions.
 
 ---
 
@@ -14,29 +14,6 @@ An explainable semiconductor chip-test yield intelligence application. Drop any 
 | **Hidden Risk Screener** | Nearest Neighbor Residual (NNR), Dynamic PAT (DPAT), Bad-Neighborhood (GDBN), Isolation Forest | Flags passing chips with latent reliability risk (validated against burn-in failures) |
 | **Test Time Optimizer** | Unique-Fail Redundancy + Pearson Correlation + 95% Rule-of-Three DPPM Bound + Reordering | Quantifies safe audit-sampling candidates and stop-on-fail speedup |
 | **Pre-Sort Yield Forecaster** | Quantile LightGBM (`P10`, `P50`, `P90`) | Predicts lot sort yield from electrical (WAT) and routing inputs before wafer testing |
-
----
-
-## Project Structure
-
-```text
-├── backend/
-│   ├── app/
-│   │   ├── engines/           # 6 ML engines + Advisor ranking & Q&A
-│   │   ├── ingest.py          # Universal CSV / multi-sheet Excel parser + auto column mapper
-│   │   ├── pipeline.py        # End-to-end orchestrator + session cache
-│   │   └── main.py            # FastAPI routes + static UI serving
-│   ├── models/                # Pre-trained PyTorch Wafer CNN (wafer_cnn.pt)
-│   └── train_wafer_model.py   # Training & hold-out lot evaluation script
-├── frontend/                  # Minimalist React + Vite daylight UI (built into frontend/dist)
-├── sample_uploads/            # Ready-to-drop demo Excel & CSV datasets
-├── create_samples.py          # Generates sample upload bundles from AX7-SOC data
-├── verify_e2e.py              # Automated end-to-end test suite
-├── run.py                     # One-command local launcher
-├── requirements.txt
-├── Dockerfile
-└── render.yaml
-```
 
 ---
 
@@ -67,17 +44,12 @@ pip install -r requirements.txt
 ```bash
 python run.py
 ```
-This automatically selects an available local port (default **http://127.0.0.1:8080**; if busy, it picks the next free port) and opens the UI in your browser.
+`run.py` automatically picks an open port, preloads the dataset at startup, and opens the dashboard directly in your browser. You can also specify a port manually:
+```bash
+python run.py --port 8090
+```
 
-### 4. Try Uploading Test Data
-Drag and drop any file from `sample_uploads/` directly onto the upload box:
-- `sample_uploads/AX7_Complete_Demo_8_Lots.xlsx` — single multi-sheet Excel workbook (`sort_die_results`, `lot_context_mes`, `wat_pcm`, `test_limits`, `final_test_burnin`)
-- `sample_uploads/AX7_Sort_Sample_14_Lots.csv` — standalone CSV test log
-- `sample_uploads/AX7_Wafer_Summary.csv` — lightweight wafer-summary CSV
-
-Or click **Run Built-in Demo Dataset** on the home screen.
-
-### (Optional) Frontend Development Mode / Verification Tests
+### (Optional) Verification & Frontend Editing
 ```bash
 # Run end-to-end verification tests
 python verify_e2e.py
@@ -92,7 +64,7 @@ npm run build
 
 ## How to Deploy & Make It Live
 
-Because the FastAPI backend serves the pre-built `frontend/dist` directly on a single port (`$PORT`), you can deploy it as one unified web service with zero separate frontend hosting required.
+Because the FastAPI backend automatically preloads the dataset on startup and serves the pre-built `frontend/dist` directly on `$PORT`, you can deploy it as one unified web service.
 
 ### Option A: Render (Recommended — Fastest via GitHub)
 This repository includes a `render.yaml` blueprint.
@@ -105,29 +77,21 @@ This repository includes a `render.yaml` blueprint.
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
    - **Health Check Path:** `/api/health`
-   - **Instance Type:** Starter (`2 GB RAM` recommended if uploading large 100k+ row Excel/CSV files; free `512 MB` works for small CSVs/demo files)
-5. Click **Create Web Service**. Once live, Render gives you a public `https://....onrender.com` URL.
-
----
+   - **Instance Type:** Starter (`2 GB RAM` recommended for fast PyTorch + LightGBM preloading)
+5. Click **Create Web Service** to get a live `https://....onrender.com` URL.
 
 ### Option B: Railway
 1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**.
 2. Select `naveensreekanth/y_adv`.
 3. Railway automatically detects the included `Dockerfile`, builds both the React UI and Python ML backend, and exposes a public domain under **Settings → Networking → Generate Domain**.
 
----
-
-### Option C: Docker (Any Cloud VM, AWS App Runner, or Google Cloud Run)
+### Option C: Docker / Google Cloud Run
 ```bash
-# Build image locally
+# Build & run locally
 docker build -t ai-yield-advisor .
-
-# Run container
 docker run -p 8000:8000 ai-yield-advisor
-```
 
-**Deploy directly to Google Cloud Run:**
-```bash
+# Or deploy to Google Cloud Run
 gcloud run deploy ai-yield-advisor \
   --source . \
   --platform managed \
@@ -137,9 +101,6 @@ gcloud run deploy ai-yield-advisor \
   --allow-unauthenticated
 ```
 
----
-
-### Option D: Hugging Face Spaces (Free Public Hosting with 16 GB RAM)
-1. Create a new Space on [huggingface.co/spaces](https://huggingface.co/spaces) with SDK **Docker**.
-2. Push this repo (or connect GitHub) and add a `README.md` frontmatter header setting `app_port: 8000` (or set `PORT=7860` in Space Variables).
-3. Hugging Face builds the `Dockerfile` automatically and gives you a live shareable demo URL with plenty of RAM for large CSV/Excel uploads.
+### Option D: Hugging Face Spaces
+1. Create a new Space on [huggingface.co/spaces](https://huggingface.co/spaces) using SDK **Docker**.
+2. Connect `naveensreekanth/y_adv` and set `PORT=7860` in Space Variables (`app_port: 7860`) to get a free live demo URL with 16 GB RAM.

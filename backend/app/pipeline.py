@@ -6,6 +6,7 @@ in-memory session state for interactive wafer Grad-CAM & Q&A drill-downs.
 """
 from __future__ import annotations
 
+import gc
 import time
 import uuid
 from collections import OrderedDict
@@ -251,10 +252,16 @@ def run_analysis_pipeline(bundle: dict[str, Any]) -> dict[str, Any]:
 
     session_id = uuid.uuid4().hex[:12]
 
-    # Store raw lightweight lookup structures in SessionStore for fast wafer/Q&A requests
+    # Store compact lookup structures in SessionStore for fast wafer/Q&A requests
     fp_indexed = None
     if fp_df is not None and not fp_df.empty:
-        fp_indexed = {k: g for k, g in fp_df.groupby(["lot_id", "wafer_id"], sort=False)}
+        keep_cols = [c for c in ["lot_id", "wafer_id", "die_x", "die_y", "pass", "soft_bin", "site"] + parametric_cols[:6] if c in fp_df.columns]
+        fp_compact = fp_df[keep_cols].copy()
+        for col in fp_compact.select_dtypes(include=["float64"]).columns:
+            fp_compact[col] = fp_compact[col].astype("float32")
+        fp_indexed = {k: g for k, g in fp_compact.groupby(["lot_id", "wafer_id"], sort=False)}
+        del fp_compact
+    gc.collect()
 
     wp_lookup = {}
     if not wafer_patterns_df.empty:

@@ -5,11 +5,10 @@ import {
   ChevronUp,
   Download,
   MessageSquare,
+  RefreshCw,
   Send,
-  Upload,
   X,
 } from 'lucide-react'
-import UploadScreen from './components/UploadScreen.jsx'
 import WaferInspector from './components/WaferInspector.jsx'
 import {
   DistributionChart,
@@ -39,65 +38,31 @@ const SAMPLE_QUESTIONS = [
 export default function App() {
   const [data, setData] = useState(null)
   const [activeTab, setActiveTab] = useState('actions')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [availableSamples, setAvailableSamples] = useState([])
-  const [hasFullDataset, setHasFullDataset] = useState(false)
   const [expandedEvidence, setExpandedEvidence] = useState({})
   const [question, setQuestion] = useState('')
   const [qaResult, setQaResult] = useState(null)
   const [asking, setAsking] = useState(false)
 
+  const loadPreloaded = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/preloaded')
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.detail || 'Failed to load preloaded dataset')
+      setData(payload)
+    } catch (err) {
+      setError(err.message || 'Could not load preloaded dataset.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    fetch('/api/health')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((info) => {
-        if (info?.samples_available) setAvailableSamples(info.samples_available)
-        if (typeof info?.has_full_dataset === 'boolean') setHasFullDataset(info.has_full_dataset)
-      })
-      .catch(() => {})
+    loadPreloaded()
   }, [])
-
-  const handleUploadFiles = async (files, matchContext) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const fd = new FormData()
-      for (const f of files) fd.append('files', f)
-      fd.append('match_reference_context', String(matchContext))
-      const res = await fetch('/api/analyze', { method: 'POST', body: fd })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.detail || 'Upload failed')
-      setData(payload)
-      setActiveTab('actions')
-      setQaResult(null)
-      setExpandedEvidence({})
-    } catch (err) {
-      setError(err.message || 'Could not process uploaded file.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleLoadSample = async (scope) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const fd = new FormData()
-      fd.append('scope', scope)
-      const res = await fetch('/api/load-sample', { method: 'POST', body: fd })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.detail || 'Failed to load sample')
-      setData(payload)
-      setActiveTab('actions')
-      setQaResult(null)
-      setExpandedEvidence({})
-    } catch (err) {
-      setError(err.message || 'Could not load sample dataset.')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleActionDecision = async (actionId, status) => {
     if (!data) return
@@ -137,17 +102,40 @@ export default function App() {
     }
   }
 
-  if (!data) {
+  if (loading && !data) {
     return (
       <div className="page-shell">
-        <UploadScreen
-          onUploadFiles={handleUploadFiles}
-          onLoadSample={handleLoadSample}
-          loading={loading}
-          error={error}
-          availableSamples={availableSamples}
-          hasFullDataset={hasFullDataset}
-        />
+        <div className="upload-container" style={{ textAlign: 'center', marginTop: 96 }}>
+          <div className="card" style={{ padding: '44px 28px' }}>
+            <h1 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 8px 0' }}>Yield Advisor</h1>
+            <p style={{ fontSize: 14, color: '#4b5563', margin: '0 0 18px 0' }}>
+              Running ML models on the preloaded AX7-SOC chip-test dataset...
+            </p>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#6b7280' }}>
+              <span
+                className="spinner"
+                style={{ borderColor: '#cbd5e1', borderTopColor: '#1e3a5f' }}
+              />
+              <span>Preparing wafer maps, trend alerts, root causes, and action plan</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !data) {
+    return (
+      <div className="page-shell">
+        <div className="upload-container" style={{ marginTop: 80 }}>
+          <div className="card">
+            <h2 className="card-title">Could not initialize dataset</h2>
+            <div className="error-banner">{error}</div>
+            <button type="button" className="btn btn-primary" style={{ marginTop: 14 }} onClick={loadPreloaded}>
+              <RefreshCw size={14} /> Retry
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -161,7 +149,7 @@ export default function App() {
         <div className="brand">
           <h1 className="brand-title">Yield Advisor</h1>
           <p className="brand-sub tabular">
-            {summary.total_lots} lots · {summary.total_wafers.toLocaleString()} wafers ·{' '}
+            Preloaded AX7-SOC · {summary.total_lots} lots · {summary.total_wafers.toLocaleString()} wafers ·{' '}
             {summary.total_chips.toLocaleString()} chips analyzed in {data.runtime_seconds}s
           </p>
         </div>
@@ -169,23 +157,12 @@ export default function App() {
         <div className="topbar-actions">
           <a
             href={`/api/session/${data.session_id}/export`}
-            className="btn"
+            className="btn btn-primary"
             style={{ textDecoration: 'none' }}
           >
             <Download size={14} />
             Export Summary
           </a>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              setData(null)
-              setError(null)
-            }}
-          >
-            <Upload size={14} />
-            Upload New File
-          </button>
         </div>
       </header>
 
@@ -635,15 +612,15 @@ export default function App() {
           </div>
 
           <div className="card">
-            <h3 className="card-title">Upload &amp; Data Quality Check</h3>
+            <h3 className="card-title">Preloaded Dataset &amp; Quality Check</h3>
             <p className="card-desc">
-              Automatic schema mapping, retest reconciliation, and ground-truth isolation checks.
+              Automatic schema reconciliation and ground-truth isolation checks.
             </p>
             <table className="clean-table">
               <thead>
                 <tr>
                   <th>Source</th>
-                  <th>Detected Role</th>
+                  <th>Role</th>
                   <th style={{ textAlign: 'right' }}>Rows</th>
                 </tr>
               </thead>
@@ -661,14 +638,6 @@ export default function App() {
             <div className="info-banner" style={{ marginTop: 14 }}>
               <div>Retest rows reconciled: <strong>{quality_report.retest_rows_detected.toLocaleString()}</strong></div>
               <div>Invalid coordinate rows dropped: <strong>{quality_report.invalid_rows_dropped}</strong></div>
-              {quality_report.enriched_context_files?.length > 0 && (
-                <div>Auto-matched context: <strong>{quality_report.enriched_context_files.join(', ')}</strong></div>
-              )}
-              {quality_report.warnings?.length > 0 && (
-                <div style={{ marginTop: 6, color: '#a15c07' }}>
-                  Notes: {quality_report.warnings.join(' | ')}
-                </div>
-              )}
             </div>
           </div>
         </div>

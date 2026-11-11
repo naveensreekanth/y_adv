@@ -304,9 +304,14 @@ def load_reference_dataset(max_lots: int | None = None) -> dict[str, Any]:
         p = REF_DATASET_DIR / fname
         if not p.exists():
             return None
-        df = pd.read_csv(p)
+        df = pd.read_csv(p, low_memory=False)
         if selected_lots is not None and "lot_id" in df.columns:
             df = df[df["lot_id"].astype(str).isin(selected_lots)].copy()
+        # Downcast float64/int64 to float32/int32 to keep memory footprint lean
+        for col in df.select_dtypes(include=["float64"]).columns:
+            df[col] = df[col].astype("float32")
+        for col in df.select_dtypes(include=["int64"]).columns:
+            df[col] = df[col].astype("int32")
         return df
 
     merged = {
