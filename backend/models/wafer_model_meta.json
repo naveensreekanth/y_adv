@@ -1,0 +1,81 @@
+{
+  "model_type": "PyTorch Multi-Label ResNet-CNN + 2D Periodicity Reticle Detector",
+  "input_shape": [
+    3,
+    32,
+    32
+  ],
+  "spatial_classes": [
+    "Edge-Ring",
+    "Center",
+    "Scratch",
+    "Loc"
+  ],
+  "all_classes": [
+    "Clean",
+    "Edge-Ring",
+    "Center",
+    "Scratch",
+    "Loc",
+    "Reticle-Repeat"
+  ],
+  "thresholds": {
+    "Edge-Ring": 0.35,
+    "Center": 0.578,
+    "Scratch": 0.35,
+    "Loc": 0.729
+  },
+  "holdout_lots": [
+    "L262201",
+    "L262205",
+    "L262209",
+    "L262214",
+    "L262215",
+    "L262220",
+    "L262222",
+    "L262228",
+    "L262234",
+    "L262238",
+    "L262239"
+  ],
+  "holdout_wafers": 275,
+  "holdout_macro_f1": 0.9908,
+  "per_class_metrics": {
+    "Clean": {
+      "precision": 0.9949,
+      "recall": 1.0,
+      "f1": 0.9974,
+      "support": 195
+    },
+    "Edge-Ring": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10
+    },
+    "Center": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 29
+    },
+    "Scratch": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 6
+    },
+    "Loc": {
+      "precision": 1.0,
+      "recall": 0.9,
+      "f1": 0.9474,
+      "support": 10
+    },
+    "Reticle-Repeat": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 25
+    }
+  }
+}
