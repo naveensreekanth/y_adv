@@ -1,0 +1,8 @@
+[project]
+name = "ai-yield-advisor"
+version = "1.0.0"
+description = "AI-Optimized Yield Advisor for Semiconductor Chip Testing"
+requires-python = ">=3.11"
+
+[tool.vercel]
+entrypoint = "backend.app.main:app"

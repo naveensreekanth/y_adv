@@ -7,10 +7,15 @@ grounded Q&A, and the minimalist React frontend.
 """
 from __future__ import annotations
 
+import sys
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, List
+
+_BACKEND_DIR = str(Path(__file__).resolve().parent.parent)
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
