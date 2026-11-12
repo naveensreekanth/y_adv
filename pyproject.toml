@@ -5,26 +5,9 @@ description = "AI-Optimized Yield Advisor for Semiconductor Chip Testing"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "python-multipart>=0.0.9",
     "pydantic>=2.9.0",
-    "pandas>=2.2.0",
-    "numpy>=2.0.0",
-    "scipy>=1.13.0",
-    "scikit-learn>=1.5.0",
-    "lightgbm>=4.5.0",
-    "shap>=0.46.0",
-    "torch>=2.5.0",
-    "openpyxl>=3.1.2",
+    "uvicorn>=0.32.0",
 ]
-
-[tool.uv.sources]
-torch = { index = "pytorch-cpu" }
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
 
 [tool.vercel]
 entrypoint = "backend.app.main:app"

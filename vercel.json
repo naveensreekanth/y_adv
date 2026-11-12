@@ -2,8 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "backend/app/main.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{frontend/node_modules/**,frontend/src/**,sample_uploads/AX7_Sort_Sample_14_Lots.csv,sample_uploads/AX7_Wafer_Summary.csv,verify_e2e.py,create_samples.py,backend/train_wafer_model.py}"
+      "maxDuration": 30,
+      "excludeFiles": "{frontend/node_modules/**,frontend/src/**,sample_uploads/**,backend/models/**,verify_e2e.py,create_samples.py,build_precomputed.py,backend/train_wafer_model.py}"
     }
   }
 }
