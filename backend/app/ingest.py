@@ -304,14 +304,63 @@ def load_reference_dataset(max_lots: int | None = None) -> dict[str, Any]:
         p = REF_DATASET_DIR / fname
         if not p.exists():
             return None
-        df = pd.read_csv(p, low_memory=False)
-        if selected_lots is not None and "lot_id" in df.columns:
-            df = df[df["lot_id"].astype(str).isin(selected_lots)].copy()
-        # Downcast float64/int64 to float32/int32 to keep memory footprint lean
-        for col in df.select_dtypes(include=["float64"]).columns:
-            df[col] = df[col].astype("float32")
-        for col in df.select_dtypes(include=["int64"]).columns:
-            df[col] = df[col].astype("int32")
+
+        read_kwargs: dict[str, Any] = {}
+        if fname == "sort_die_results.csv":
+            read_kwargs = {
+                "usecols": [
+                    "lot_id", "wafer_id", "die_x", "die_y", "site", "insertion",
+                    "tester_id", "probe_card_id", "program_rev", "soft_bin", "pass",
+                    "test_time_ms", *KNOWN_PARAMETRICS,
+                ],
+                "dtype": {
+                    "lot_id": "string",
+                    "wafer_id": "int16",
+                    "die_x": "int16",
+                    "die_y": "int16",
+                    "site": "int8",
+                    "insertion": "int8",
+                    "tester_id": "category",
+                    "probe_card_id": "category",
+                    "program_rev": "category",
+                    "soft_bin": "int16",
+                    "pass": "int8",
+                    "test_time_ms": "float32",
+                    **{k: "float32" for k in KNOWN_PARAMETRICS},
+                },
+                "chunksize": 100_000,
+            }
+        elif fname == "final_test_burnin.csv":
+            read_kwargs = {
+                "usecols": ["lot_id", "wafer_id", "die_x", "die_y", "burnin_fail"],
+                "dtype": {
+                    "lot_id": "string",
+                    "wafer_id": "int16",
+                    "die_x": "int16",
+                    "die_y": "int16",
+                    "burnin_fail": "int8",
+                },
+                "chunksize": 100_000,
+            }
+
+        if "chunksize" in read_kwargs:
+            chunks = []
+            for chunk in pd.read_csv(p, **read_kwargs):
+                if selected_lots is not None and "lot_id" in chunk.columns:
+                    chunk = chunk[chunk["lot_id"].astype(str).isin(selected_lots)]
+                if not chunk.empty:
+                    chunks.append(chunk)
+            if not chunks:
+                return pd.DataFrame()
+            df = pd.concat(chunks, ignore_index=True)
+        else:
+            df = pd.read_csv(p)
+            if selected_lots is not None and "lot_id" in df.columns:
+                df = df[df["lot_id"].astype(str).isin(selected_lots)].copy()
+            for col in df.select_dtypes(include=["float64"]).columns:
+                df[col] = df[col].astype("float32")
+            for col in df.select_dtypes(include=["int64"]).columns:
+                df[col] = df[col].astype("int32")
         return df
 
     merged = {
@@ -379,10 +428,9 @@ def build_canonical_bundle(
     parametric_cols: list[str] = []
 
     if sort_df is not None:
-        sort_df = sort_df.copy()
         sort_df["lot_id"] = sort_df["lot_id"].astype(str)
-        sort_df["wafer_id"] = pd.to_numeric(sort_df["wafer_id"], errors="coerce").fillna(1).astype(int)
-        sort_df["insertion"] = pd.to_numeric(sort_df["insertion"], errors="coerce").fillna(1).astype(int)
+        sort_df["wafer_id"] = pd.to_numeric(sort_df["wafer_id"], errors="coerce").fillna(1).astype("int32")
+        sort_df["insertion"] = pd.to_numeric(sort_df["insertion"], errors="coerce").fillna(1).astype("int8")
 
         if "die_x" in sort_df.columns and "die_y" in sort_df.columns:
             sort_df["die_x"] = pd.to_numeric(sort_df["die_x"], errors="coerce")
@@ -391,16 +439,19 @@ def build_canonical_bundle(
             if bad.any():
                 quality_report["invalid_rows_dropped"] = int(bad.sum())
                 sort_df = sort_df[~bad].copy()
-            sort_df["die_x"] = sort_df["die_x"].astype(int)
-            sort_df["die_y"] = sort_df["die_y"].astype(int)
+            sort_df["die_x"] = sort_df["die_x"].astype("int16")
+            sort_df["die_y"] = sort_df["die_y"].astype("int16")
 
         if "soft_bin" not in sort_df.columns:
-            sort_df["soft_bin"] = np.where(sort_df["pass"] == 1, 1, 99)
+            sort_df["soft_bin"] = np.where(sort_df["pass"] == 1, 1, 99).astype("int16")
         else:
-            sort_df["soft_bin"] = pd.to_numeric(sort_df["soft_bin"], errors="coerce").fillna(1).astype(int)
+            sort_df["soft_bin"] = pd.to_numeric(sort_df["soft_bin"], errors="coerce").fillna(1).astype("int16")
 
-        # Derive timestamp ordering if missing
-        if "ts" in sort_df.columns:
+        has_external_ts = (
+            (merged.get("lots") is not None and "sort_start_ts" in merged["lots"].columns)
+            or (ws_df is not None and "sort_start_ts" in ws_df.columns)
+        )
+        if not has_external_ts and "ts" in sort_df.columns:
             sort_df["_ts_parsed"] = pd.to_datetime(sort_df["ts"], errors="coerce")
         else:
             sort_df["_ts_parsed"] = pd.NaT

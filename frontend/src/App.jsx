@@ -11,21 +11,14 @@ import {
 } from 'lucide-react'
 import WaferInspector from './components/WaferInspector.jsx'
 import {
-  DistributionChart,
-  ForecastChart,
   LotTrendChart,
   ParetoChart,
-  ProbeSiteChart,
-  ShapBars,
-  TestTimeBars,
 } from './components/SvgCharts.jsx'
 
 const TABS = [
   { id: 'actions', label: 'Action Plan' },
   { id: 'wafers', label: 'Wafer Maps' },
   { id: 'trends', label: 'Trends & Causes' },
-  { id: 'risk_speed', label: 'Hidden Risk & Speed' },
-  { id: 'models', label: 'Model Transparency' },
 ]
 
 const SAMPLE_QUESTIONS = [
@@ -140,7 +133,7 @@ export default function App() {
     )
   }
 
-  const { summary, actions, pareto, excursion, root_cause, outliers, test_optimizer, yield_forecast, models_used, quality_report } = data
+  const { summary, actions, pareto, excursion } = data
 
   return (
     <div className="page-shell">
@@ -407,238 +400,6 @@ export default function App() {
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="grid-2">
-            <div className="card">
-              <h3 className="card-title">Top Yield-Loss Drivers (ML Attribution)</h3>
-              <p className="card-desc">
-                Gradient-boosted model (LightGBM + SHAP) ranking equipment, wafer electrical tests, and time windows.
-              </p>
-              <ShapBars items={root_cause.shap_feature_importance} />
-            </div>
-
-            <div className="card">
-              <h3 className="card-title">Statistical Commonality Verification</h3>
-              <p className="card-desc">
-                Equipment and process factors verified with Fisher / Mann-Whitney significance tests.
-              </p>
-              {root_cause.ranked_causes?.length > 0 ? (
-                <table className="clean-table">
-                  <thead>
-                    <tr>
-                      <th>Factor</th>
-                      <th>Pattern / Effect</th>
-                      <th style={{ textAlign: 'right' }}>Impact</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {root_cause.ranked_causes.map((rc, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 500, color: '#111827' }}>{rc.factor}</td>
-                        <td>{rc.signature} ({rc.wafers_affected} wafers)</td>
-                        <td className="tabular" style={{ textAlign: 'right', color: '#b42318', fontWeight: 500 }}>
-                          -{rc.est_dataset_yield_impact_pts} pts
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="card-desc">No single equipment factor showed significant yield separation.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid-2">
-            <div className="card">
-              <h3 className="card-title">Probe Card vs. Silicon Check</h3>
-              <p className="card-desc">
-                Comparing the 4 probe sites on each card reveals whether failures come from worn test needles or real wafer defects.
-              </p>
-              <ProbeSiteChart siteSummary={root_cause.probe_site_summary} />
-
-              {root_cause.retest_summary?.length > 0 && (
-                <div className="info-banner" style={{ marginTop: 12 }}>
-                  {root_cause.retest_summary.map((r) => (
-                    <div key={r.soft_bin}>
-                      <strong>{r.bin_name} retest recovery:</strong> {r.recovery_rate_pct}% passed on retest (
-                      {r.recovered_dies.toLocaleString()} of {r.retested_dies.toLocaleString()} chips recovered).
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="card">
-              <h3 className="card-title">Pre-Sort Yield Forecast</h3>
-              <p className="card-desc">
-                {yield_forecast.available
-                  ? `Predicted from early electrical measurements (WAT) before wafer testing · Average error (MAE): ${yield_forecast.mae_yield_pts} yield pts.`
-                  : yield_forecast.reason}
-              </p>
-              {yield_forecast.available && <ForecastChart forecasts={yield_forecast.lot_forecasts} />}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 4: Hidden Risk & Speed */}
-      {activeTab === 'risk_speed' && (
-        <div className="grid-2">
-          <div className="card">
-            <h3 className="card-title">Hidden Risk Screening (Passing Chips)</h3>
-            <p className="card-desc">
-              Some chips pass static specification limits yet behave very differently from their neighbors on the wafer.
-            </p>
-
-            {outliers.available ? (
-              <>
-                <DistributionChart bins={outliers.iddq_distribution} />
-
-                {outliers.burnin_validation && (
-                  <div className="info-banner" style={{ marginTop: 14, background: '#ecfdf3', borderColor: '#abefc6' }}>
-                    <div style={{ fontWeight: 600, color: '#1f6f4a', marginBottom: 4 }}>
-                      Validated Against Burn-In Failures
-                    </div>
-                    <div>
-                      Chips flagged by Neighbor Spike (NNR) failed burn-in at{' '}
-                      <strong>{outliers.burnin_validation.nnr_fail_rate_pct}%</strong> vs{' '}
-                      <strong>{outliers.burnin_validation.baseline_fail_rate_pct}%</strong> for normal passing chips —
-                      catching <strong>{outliers.burnin_validation.burnin_recall_pct}%</strong> of all burn-in failures at only{' '}
-                      <strong>{outliers.burnin_validation.yield_cost_pct}%</strong> yield cost.
-                    </div>
-                  </div>
-                )}
-
-                <table className="clean-table" style={{ marginTop: 14 }}>
-                  <thead>
-                    <tr>
-                      <th>Screening Method</th>
-                      <th style={{ textAlign: 'right' }}>Flagged</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {outliers.screens.map((s) => (
-                      <tr key={s.key}>
-                        <td>
-                          <div style={{ fontWeight: 500, color: '#111827' }}>{s.name}</div>
-                          <div style={{ fontSize: 12, color: '#6b7280' }}>{s.plain_desc}</div>
-                        </td>
-                        <td className="tabular" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          {s.flagged_count.toLocaleString()} ({s.flagged_pct}%)
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            ) : (
-              <p className="card-desc">{outliers.reason}</p>
-            )}
-          </div>
-
-          <div className="card">
-            <h3 className="card-title">Faster Testing Opportunities</h3>
-            <p className="card-desc">
-              {test_optimizer.available
-                ? `Identifies redundant or near-zero-fail tests to move to 5% audit sampling — saving ${test_optimizer.total_saved_ms} ms/chip (${test_optimizer.pct_time_reduction}% faster).`
-                : test_optimizer.reason}
-            </p>
-
-            {test_optimizer.available && (
-              <>
-                <TestTimeBars items={test_optimizer.test_items} />
-
-                {test_optimizer.candidates?.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                      Safe Sampling / Removal Candidates
-                    </div>
-                    <table className="clean-table">
-                      <thead>
-                        <tr>
-                          <th>Test Item</th>
-                          <th>Why Safe</th>
-                          <th style={{ textAlign: 'right' }}>95% Risk Bound</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {test_optimizer.candidates.map((c) => (
-                          <tr key={c.test_name}>
-                            <td style={{ fontWeight: 500, color: '#111827' }}>{c.test_name}</td>
-                            <td style={{ fontSize: 12 }}>{c.reason}</td>
-                            <td className="tabular" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                              &le; {c.escape_bound_dppm} DPPM
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 5: Model Transparency */}
-      {activeTab === 'models' && (
-        <div className="grid-2">
-          <div className="card">
-            <h3 className="card-title">Machine Learning Models Used</h3>
-            <p className="card-desc">
-              Every insight is produced dynamically by specialized models — no hardcoded rules.
-            </p>
-            <table className="clean-table">
-              <thead>
-                <tr>
-                  <th>Engine</th>
-                  <th>Model / Method</th>
-                  <th>Validation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {models_used.map((m) => (
-                  <tr key={m.engine}>
-                    <td style={{ fontWeight: 500, color: '#111827' }}>{m.engine}</td>
-                    <td>{m.model}</td>
-                    <td className="tabular">{m.metric}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="card">
-            <h3 className="card-title">Preloaded Dataset &amp; Quality Check</h3>
-            <p className="card-desc">
-              Automatic schema reconciliation and ground-truth isolation checks.
-            </p>
-            <table className="clean-table">
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Role</th>
-                  <th style={{ textAlign: 'right' }}>Rows</th>
-                </tr>
-              </thead>
-              <tbody>
-                {quality_report.files_loaded.map((f, idx) => (
-                  <tr key={idx}>
-                    <td style={{ fontWeight: 500, color: '#111827' }}>{f.file}</td>
-                    <td>{f.role}</td>
-                    <td className="tabular" style={{ textAlign: 'right' }}>{f.rows.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="info-banner" style={{ marginTop: 14 }}>
-              <div>Retest rows reconciled: <strong>{quality_report.retest_rows_detected.toLocaleString()}</strong></div>
-              <div>Invalid coordinate rows dropped: <strong>{quality_report.invalid_rows_dropped}</strong></div>
-            </div>
           </div>
         </div>
       )}

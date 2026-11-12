@@ -10,15 +10,15 @@ from __future__ import annotations
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.ingest import REF_DATASET_DIR, load_reference_dataset
+from app.ingest import REF_DATASET_DIR, load_reference_dataset, parse_uploaded_files
 from app.pipeline import (
     SESSIONS,
     ask_session_advisor,
@@ -28,6 +28,7 @@ from app.pipeline import (
 )
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+SAMPLES_DIR = ROOT_DIR / "sample_uploads"
 FRONTEND_DIST = ROOT_DIR / "frontend" / "dist"
 
 _PRELOAD_LOCK = threading.Lock()
@@ -92,6 +93,7 @@ def health():
         "status": "ok",
         "ready": _PRELOADED_RESULT is not None,
         "has_full_dataset": REF_DATASET_DIR.exists(),
+        "samples_available": sorted([p.name for p in SAMPLES_DIR.glob("*") if p.is_file()]) if SAMPLES_DIR.exists() else [],
         "error": _PRELOAD_ERROR,
     }
 
@@ -106,6 +108,42 @@ def get_preloaded():
         return _run_preload()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to load dataset: {exc}") from exc
+
+
+@app.post("/api/analyze")
+async def analyze_upload(
+    files: List[UploadFile] = File(...),
+    match_reference_context: bool = Form(False),
+):
+    if not files:
+        raise HTTPException(status_code=400, detail="Please upload at least one CSV or Excel file.")
+
+    parsed_inputs: list[tuple[str, bytes]] = []
+    for f in files:
+        content = await f.read()
+        if content:
+            parsed_inputs.append((f.filename or "upload.csv", content))
+
+    if not parsed_inputs:
+        raise HTTPException(status_code=400, detail="Uploaded file(s) are empty.")
+
+    try:
+        bundle = parse_uploaded_files(parsed_inputs, match_reference_context=match_reference_context)
+        return run_analysis_pipeline(bundle)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}") from exc
+
+
+@app.get("/api/samples/{filename}")
+def download_sample(filename: str):
+    if not SAMPLES_DIR.exists():
+        raise HTTPException(status_code=404, detail="Samples directory not found.")
+    target = (SAMPLES_DIR / filename).resolve()
+    if target.parent != SAMPLES_DIR.resolve() or not target.exists():
+        raise HTTPException(status_code=404, detail=f"Sample file '{filename}' not found.")
+    return FileResponse(path=str(target), filename=target.name)
 
 
 @app.get("/api/session/{session_id}/wafer/{lot_id}/{wafer_id}")

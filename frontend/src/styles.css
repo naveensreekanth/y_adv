@@ -343,11 +343,11 @@ button, input, select {
 
 /* Tabs */
 .tabs {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 22px;
-  overflow-x: auto;
 }
 
 .tab-btn {
@@ -360,6 +360,7 @@ button, input, select {
   border-bottom: 2px solid transparent;
   cursor: pointer;
   white-space: nowrap;
+  text-align: center;
   transition: color 0.15s, border-color 0.15s;
 }
 

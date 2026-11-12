@@ -30,7 +30,8 @@ def analyze_outliers(
     if final_disp_df is None or final_disp_df.empty:
         return {"available": False, "reason": "Die-level parametric data required for outlier screening."}
 
-    passing = final_disp_df[final_disp_df["pass"] == 1].copy()
+    keep = [c for c in ["lot_id", "wafer_id", "die_x", "die_y", "IDDQ", "LEAKAGE", "VMIN", "FMAX", "PLL_LOCK", "CONTACT_RES"] if c in final_disp_df.columns]
+    passing = final_disp_df.loc[final_disp_df["pass"] == 1, keep].copy()
     if len(passing) < 30:
         return {"available": False, "reason": "Too few passing dies for statistical screening."}
 
